@@ -28,7 +28,7 @@ Rationale for single PR: Phase 3 (orphan branch squash) collapses all prior chan
 
 Remove build artifacts from git tracking. These must run in order because each `git rm --cached` stages deletions that accumulate toward the final commit.
 
-- [ ] **T01** Add `.atl/` to `.gitignore`
+- [x] **T01** Add `.atl/` to `.gitignore`
   - **File**: `.gitignore`
   - **Action**: Append `.atl/` entry under a new `# Tools` section at the end of the file
   - **Detail**: Add after line 28 (after the `data/docs/*.docx` line). Add a blank line, then `# Tools` comment, then `.atl/`
@@ -36,21 +36,21 @@ Remove build artifacts from git tracking. These must run in order because each `
   - **Effort**: Small
   - **Verification**: `grep -q '^\.atl/$' .gitignore` returns 0
 
-- [ ] **T02** Untrack `frontend/.next/` build artifacts from git index
+- [x] **T02** Untrack `frontend/.next/` build artifacts from git index
   - **Command**: `git rm -r --cached frontend/.next/`
   - **Detail**: Removes ~1786 files from git tracking. Files remain on disk. The `frontend/.next/` pattern is already in `.gitignore` so they won't be re-tracked.
   - **Depends on**: Nothing (can run in parallel with T01)
   - **Effort**: Small (single command, but large output)
   - **Verification**: `git ls-files --cached frontend/.next/ | wc -l` returns 0
 
-- [ ] **T03** Untrack all `__pycache__/` directories from git index
+- [x] **T03** Untrack all `__pycache__/` directories from git index
   - **Command**: `git rm -r --cached '**/__pycache__'` (or `git ls-files --cached | grep '__pycache__' | xargs git rm --cached`)
   - **Detail**: Removes ~35 `.pyc` files from tracking. `__pycache__/` is already in `.gitignore`.
   - **Depends on**: Nothing (can run in parallel with T01, T02)
   - **Effort**: Small
   - **Verification**: `git ls-files --cached | grep '__pycache__' | wc -l` returns 0
 
-- [ ] **T04** Untrack `.atl/` tool metadata from git index
+- [x] **T04** Untrack `.atl/` tool metadata from git index
   - **Command**: `git rm -r --cached .atl/`
   - **Detail**: Removes 2 files from tracking. Depends on T01 being done first so `.atl/` is in `.gitignore` before untracking (prevents accidental re-add).
   - **Depends on**: T01 (must have `.atl/` in `.gitignore` first)
@@ -61,7 +61,7 @@ Remove build artifacts from git tracking. These must run in order because each `
 
 All tasks in this phase are independent of each other and can be done in any order.
 
-- [ ] **T05** Create `LICENSE` file with GPL v3 full text
+- [x] **T05** Create `LICENSE` file with GPL v3 full text
   - **File**: `LICENSE` (new file at repo root)
   - **Action**: Create the file with the full GNU General Public License v3.0 text. Standard license, available from https://www.gnu.org/licenses/gpl-3.0.txt
   - **Detail**: The file should contain the complete GPL v3 license text. No customization needed — it's a standard license.
@@ -69,7 +69,7 @@ All tasks in this phase are independent of each other and can be done in any ord
   - **Effort**: Small (copy-paste standard text)
   - **Verification**: `test -f LICENSE && head -1 LICENSE | grep -q 'GNU GENERAL PUBLIC LICENSE'`
 
-- [ ] **T06** Fix README.md broken references and remove LangChain mention
+- [x] **T06** Fix README.md broken references and remove LangChain mention
   - **File**: `README.md`
   - **Action**: Four edits required:
     1. **Line 369**: Change `data/docs/sample_contract.txt` → `data/docs/travel_policy.md` and update description from "Example contract" → "Example travel policy"
@@ -81,14 +81,14 @@ All tasks in this phase are independent of each other and can be done in any ord
   - **Effort**: Small
   - **Verification**: `grep -c 'sample_contract\|technical_spec\|LangChain' README.md` returns 0
 
-- [ ] **T07** Rename `PROJECT_README.md` → `ARCHITECTURE.md`
+- [x] **T07** Rename `PROJECT_README.md` → `ARCHITECTURE.md`
   - **Command**: `git mv PROJECT_README.md ARCHITECTURE.md`
   - **Detail**: Use `git mv` to preserve history. No content changes needed. Verified that no files outside `openspec/` reference `PROJECT_README.md`, so no link updates required.
   - **Depends on**: Nothing
   - **Effort**: Small
   - **Verification**: `test -f ARCHITECTURE.md && ! test -f PROJECT_README.md`
 
-- [ ] **T08** Create `CONTRIBUTING.md`
+- [x] **T08** Create `CONTRIBUTING.md`
   - **File**: `CONTRIBUTING.md` (new file at repo root)
   - **Action**: Create a contributing guide for public audience. Include sections:
     - How to report bugs (open an issue)
@@ -101,7 +101,7 @@ All tasks in this phase are independent of each other and can be done in any ord
   - **Effort**: Medium
   - **Verification**: `test -f CONTRIBUTING.md && grep -q 'GPL' CONTRIBUTING.md`
 
-- [ ] **T09** Create root `.dockerignore`
+- [x] **T09** Create root `.dockerignore`
   - **File**: `.dockerignore` (new file at repo root)
   - **Action**: Create with these exclusions:
     ```
@@ -128,7 +128,7 @@ All tasks in this phase are independent of each other and can be done in any ord
   - **Effort**: Small
   - **Verification**: `test -f .dockerignore && grep -q 'frontend/.next/' .dockerignore`
 
-- [ ] **T10** Add dev-password comment to `docker-compose.yml`
+- [x] **T10** Add dev-password comment to `docker-compose.yml`
   - **File**: `docker-compose.yml`
   - **Action**: Add a comment above the `POSTGRES_PASSWORD: rag` line (line 6) warning that this is a dev-only password.
   - **Detail**: Change line 6 from:
@@ -144,7 +144,7 @@ All tasks in this phase are independent of each other and can be done in any ord
   - **Effort**: Small
   - **Verification**: `grep -q 'Dev only' docker-compose.yml`
 
-- [ ] **T11** Create `frontend/app/icon.svg` favicon
+- [x] **T11** Create `frontend/app/icon.svg` favicon
   - **File**: `frontend/app/icon.svg` (new file)
   - **Action**: Create a minimal SVG favicon. Next.js App Router convention: place `icon.svg` in `app/` directory and it's automatically served as the site favicon.
   - **Detail**: Use a simple, clean SVG — e.g., a rounded rectangle with "AI" text or a simple geometric shape. Keep it under 1 KB. Example:
@@ -162,7 +162,7 @@ All tasks in this phase are independent of each other and can be done in any ord
 
 Create a clean single-commit history via orphan branch.
 
-- [ ] **T12** Create orphan branch and squash all changes into a single clean commit
+- [x] **T12** Create orphan branch and squash all changes into a single clean commit
   - **Commands**:
     ```bash
     # Stage all changes from Phases 1-2
@@ -200,19 +200,19 @@ Create a clean single-commit history via orphan branch.
 
 Final checks before the repo is ready for `git push`.
 
-- [ ] **T13** Verify no build artifacts are tracked in git
+- [x] **T13** Verify no build artifacts are tracked in git
   - **Command**: `git ls-files --cached | grep -E '(frontend/\.next/|__pycache__|\.atl/)' | wc -l`
   - **Expected**: Returns `0`
   - **Depends on**: T12 (post-squash verification)
   - **Effort**: Small
 
-- [ ] **T14** Verify no broken README references remain
+- [x] **T14** Verify no broken README references remain
   - **Command**: `grep -n 'sample_contract\|technical_spec\|LangChain' README.md`
   - **Expected**: No output (exit code 1)
   - **Depends on**: T12
   - **Effort**: Small
 
-- [ ] **T15** Verify all new files exist
+- [x] **T15** Verify all new files exist
   - **Command**:
     ```bash
     for f in LICENSE ARCHITECTURE.md CONTRIBUTING.md .dockerignore frontend/app/icon.svg; do
@@ -224,7 +224,7 @@ Final checks before the repo is ready for `git push`.
   - **Depends on**: T12
   - **Effort**: Small
 
-- [ ] **T16** Docker Compose configuration smoke test
+- [x] **T16** Docker Compose configuration smoke test
   - **Command**: `docker compose config > /dev/null`
   - **Expected**: Exit code 0 (valid YAML, all references resolve)
   - **Detail**: This validates that docker-compose.yml is still valid after the comment addition and that the .dockerignore doesn't break anything. Full `docker compose build` is optional and may be skipped if Docker is not available or build times are prohibitive.
