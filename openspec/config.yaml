@@ -1,0 +1,64 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Python 3.11+ / FastAPI backend, Next.js 14 (React 18, TypeScript) frontend in frontend/
+  Architecture: Hexagonal (ports & adapters) — src/ports, src/adapters, src/core, src/api; DI container in src/container.py
+  Data: PostgreSQL 16 + pgvector (BM25 tsvector + dense vectors), Ollama embedder/generator (local)
+  Testing: pytest (unit; integration via testcontainers needs Docker; e2e via --e2e needs compose stack)
+  Style: ruff lint + format (line-length 100, rules E/F/I/N/W)
+
+strict_tdd: true
+
+testing:
+  runner:
+    command: "pytest"
+    framework: pytest 9.1.1 (pytest-asyncio, asyncio_mode=auto)
+  layers:
+    unit:
+      available: true
+      tool: pytest (tests/unit)
+    integration:
+      available: true
+      tool: pytest -m integration + testcontainers[postgres] (requires Docker)
+    e2e:
+      available: true
+      tool: pytest --e2e tests/e2e (requires docker compose stack)
+  coverage:
+    available: false
+    command: "" # pytest-cov not installed
+  quality:
+    linter:
+      available: true
+      command: "ruff check ."
+    type_checker:
+      available: false
+      command: "" # frontend only: TypeScript enforced by next build; no mypy/pyright for backend
+    formatter:
+      available: true
+      command: "ruff format ."
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Reference ADR IDs from README.md when decisions are affected
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns
+      - Hexagonal rule - new behavior goes through ports/adapters, no infra imports in src/core
+    tdd: true # RED-GREEN-REFACTOR enabled; strict_tdd resolved from detected pytest
+    test_command: "pytest tests/unit" # fast loop; integration needs Docker (pytest -m integration)
+  verify:
+    test_command: "pytest" # unit + integration; add --e2e with compose stack up
+    build_command: "cd frontend && npm run build"
+    coverage_threshold: 0 # pytest-cov not installed yet
+  archive:
+    - Warn before merging destructive deltas
