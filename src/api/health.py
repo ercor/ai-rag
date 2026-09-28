@@ -54,7 +54,22 @@ async def ready():
         logger.warning("Ollama readiness check failed: %s", exc)
         checks["ollama"] = f"error: {exc}"
 
-    all_ok = all(v == "ok" for v in checks.values())
+    # Check Redis connectivity (graceful — does NOT fail the health check)
+    if settings.cache_enabled:
+        try:
+            import redis.asyncio as aioredis
+
+            r = aioredis.from_url(settings.redis_url, decode_responses=True)
+            await r.ping()
+            await r.aclose()
+            checks["redis"] = "ok"
+        except Exception as exc:
+            logger.warning("Redis readiness check failed: %s", exc)
+            checks["redis"] = "degraded"
+    else:
+        checks["redis"] = "disabled"
+
+    all_ok = all(v == "ok" or v == "disabled" for v in checks.values())
 
     if not all_ok:
         raise HTTPException(

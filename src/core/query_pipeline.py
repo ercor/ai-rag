@@ -1,15 +1,17 @@
 """Query pipeline — orchestrates the full retrieval-to-generation flow.
 
-Coordinates: embed query -> retrieve -> [rerank] -> abstain? -> build prompt ->
-generate -> validate citations -> persist answer.
+Coordinates: [cache_check] -> embed query -> retrieve -> [rerank] -> abstain?
+-> build prompt -> generate -> validate citations -> persist -> [cache_store].
 """
 
 import asyncio
+import json
 import logging
 import uuid
 from dataclasses import dataclass
 
 from src.config import get_settings
+from src.core.cache_key import compute_cache_key
 from src.core.retrieval import RetrievedChunk, rrf_fusion, rrf_fusion_multi, should_abstain
 
 logger = logging.getLogger(__name__)
@@ -81,6 +83,7 @@ class QueryPipeline:
         answer_repository,
         reranker=None,
         query_rewriter=None,
+        cache=None,
     ):
         self.embedder = embedder
         self.search_index = search_index
@@ -89,6 +92,7 @@ class QueryPipeline:
         self.answer_repository = answer_repository
         self.reranker = reranker
         self.query_rewriter = query_rewriter
+        self.cache = cache
 
     async def retrieve(self, question: str) -> QueryResult:
         """Phase 1: Embed query, retrieve chunks, check abstention.
@@ -154,6 +158,56 @@ class QueryPipeline:
                 retrieved_chunks=[],
                 error=str(exc),
             )
+
+    async def check_cache(self, question: str, filters: dict | None = None) -> dict | None:
+        """Check cache for a previously computed answer.
+
+        Returns the cached answer dict (with 'answer' and 'citations' keys)
+        on a cache hit, or None on a miss / when cache is disabled.
+        """
+        if self.cache is None:
+            return None
+
+        settings = get_settings()
+        key = compute_cache_key(question, filters)
+        cached = await self.cache.get(key)
+
+        if cached is not None:
+            logger.info("Cache HIT for query: %s", question[:100])
+            try:
+                return json.loads(cached)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning("Cache contained invalid JSON for key %s", key)
+                return None
+
+        logger.info("Cache MISS for query: %s", question[:100])
+        return None
+
+    async def store_in_cache(
+        self,
+        question: str,
+        answer_text: str,
+        citations: list[dict],
+        filters: dict | None = None,
+    ) -> None:
+        """Store a successful answer in the cache.
+
+        Only stores completed answers (not failures or abstentions).
+        Silently no-ops on cache errors.
+        """
+        if self.cache is None:
+            return
+
+        settings = get_settings()
+        key = compute_cache_key(question, filters)
+        value = json.dumps({"answer": answer_text, "citations": citations})
+
+        await self.cache.set(key, value, ttl_seconds=settings.cache_ttl_seconds)
+        logger.info(
+            "Cached answer for query: %s (ttl=%ds)",
+            question[:100],
+            settings.cache_ttl_seconds,
+        )
 
     async def _retrieve_single_query(
         self, question: str, settings

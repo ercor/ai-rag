@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from src.container import (
     get_answer_repository,
+    get_cache,
     get_citation_validator,
     get_embedder,
     get_generator,
@@ -54,6 +55,7 @@ def _get_pipeline() -> QueryPipeline:
     answer_repository = get_answer_repository()
     reranker = get_reranker()
     query_rewriter = get_query_rewriter()
+    cache = get_cache()
 
     if not all([embedder, search_index, generator, citation_validator, answer_repository]):
         missing = []
@@ -80,6 +82,7 @@ def _get_pipeline() -> QueryPipeline:
         answer_repository=answer_repository,
         reranker=reranker,
         query_rewriter=query_rewriter,
+        cache=cache,
     )
 
 
@@ -101,6 +104,17 @@ async def create_answer(req: CreateAnswerRequest):
         )
 
     pipeline = _get_pipeline()
+
+    # Cache check — return cached answer immediately on hit
+    cached = await pipeline.check_cache(req.question.strip())
+    if cached is not None:
+        return {
+            "answer_id": None,
+            "status": "answered",
+            "answer": cached.get("answer"),
+            "citations": cached.get("citations", []),
+            "cached": True,
+        }
 
     # Phase 1: Retrieval (synchronous)
     query_result = await pipeline.retrieve(req.question.strip())
@@ -187,6 +201,13 @@ async def _run_generation(pipeline: QueryPipeline, query_result, queue: asyncio.
             answer_id=answer_id,
             status="answered",
             answer=cleaned_text,
+            citations=final_citations,
+        )
+
+        # Store in cache (only successful answers, not failures/abstentions)
+        await pipeline.store_in_cache(
+            question=query_result.question,
+            answer_text=cleaned_text,
             citations=final_citations,
         )
 

@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     query_rewriter_enabled: bool = False
     query_rewriter_num_variants: int = 3
 
+    # Redis Caching
+    cache_enabled: bool = True
+    redis_url: str = "redis://localhost:6379"
+    cache_ttl_seconds: int = 1800
+
     # Adapter selectors (for future multi-adapter support)
     embedder_adapter: str = "ollama"
     generator_adapter: str = "ollama"

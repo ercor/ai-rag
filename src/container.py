@@ -159,6 +159,22 @@ def get_query_rewriter():
     )
 
 
+def get_cache():
+    """Return the Cache adapter instance.
+
+    When cache_enabled=true: returns RedisCache connected to redis_url.
+    When cache_enabled=false: returns NoopCache (always misses).
+    """
+    settings = _get_settings()
+    if not settings.cache_enabled:
+        from src.adapters.noop_cache import NoopCache
+
+        return NoopCache()
+    from src.adapters.redis_cache import RedisCache
+
+    return RedisCache(redis_url=settings.redis_url)
+
+
 def get_ingestion_service():
     """Return a fully-wired IngestionService instance."""
     from src.core.ingestion_service import IngestionService

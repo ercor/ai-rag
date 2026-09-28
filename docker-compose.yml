@@ -28,6 +28,16 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: .
@@ -44,6 +54,9 @@ services:
       MIN_SCORE_THRESHOLD: "0.0"
       EMBEDDER_ADAPTER: ollama
       GENERATOR_ADAPTER: ollama
+      REDIS_URL: redis://redis:6379
+      CACHE_ENABLED: "true"
+      CACHE_TTL_SECONDS: "1800"
     volumes:
       - ./data/docs:/app/data/docs:ro
     depends_on:
