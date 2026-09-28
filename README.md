@@ -18,6 +18,7 @@ This system enables users to ask questions in natural language and receive answe
 
 ### Core Features
 - **Hybrid Retrieval**: Combines lexical search (BM25 via PostgreSQL tsvector) with semantic search (vector similarity via pgvector) using Reciprocal Rank Fusion (RRF)
+- **Cross-Encoder Reranking**: Optional re-scoring of retrieval candidates using a cross-encoder model (`ms-marco-MiniLM-L-6-v2`) for improved precision. Fetches top-20 from RRF, reranks, and keeps top-5. Toggleable via `RERANKER_ENABLED` env var
 - **Structure-Aware Chunking**: Block-based chunking that preserves document hierarchy (headings, lists, tables) and respects block boundaries
 - **Grounded Generation**: LLM generates answers only from retrieved evidence, with strict citation requirements
 - **Citation Validation**: Post-generation validation ensures all citations reference actual retrieved chunks
@@ -36,7 +37,7 @@ This system enables users to ask questions in natural language and receive answe
 - **GPU Acceleration**: Automatic GPU detection with dynamic batch size adjustment for 4x throughput improvement
 - **Threaded Parsing**: Sync parser libraries run in thread pool to avoid blocking the event loop
 - **Docker Compose**: One-command deployment with all dependencies
-- **Comprehensive Testing**: 151 unit tests + integration tests (pytest)
+- **Comprehensive Testing**: 173 unit tests + integration tests (pytest)
 - **OpenTelemetry Ready**: Structured for observability (logging in place, metrics/tracing ready)
 
 ## 🏗️ Architecture

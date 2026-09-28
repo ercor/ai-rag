@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 5
     min_score_threshold: float = 0.0
 
+    # Cross-Encoder Reranking
+    reranker_enabled: bool = True
+    reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    reranker_top_k_before: int = 20
+    reranker_top_k_after: int = 5
+    reranker_timeout_seconds: float = 5.0
+
     # Adapter selectors (for future multi-adapter support)
     embedder_adapter: str = "ollama"
     generator_adapter: str = "ollama"

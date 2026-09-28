@@ -1,9 +1,10 @@
 """Query pipeline — orchestrates the full retrieval-to-generation flow.
 
-Coordinates: embed query -> retrieve -> abstain? -> build prompt ->
+Coordinates: embed query -> retrieve -> [rerank] -> abstain? -> build prompt ->
 generate -> validate citations -> persist answer.
 """
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -78,12 +79,14 @@ class QueryPipeline:
         generator,
         citation_validator,
         answer_repository,
+        reranker=None,
     ):
         self.embedder = embedder
         self.search_index = search_index
         self.generator = generator
         self.citation_validator = citation_validator
         self.answer_repository = answer_repository
+        self.reranker = reranker
 
     async def retrieve(self, question: str) -> QueryResult:
         """Phase 1: Embed query, retrieve chunks, check abstention.
@@ -99,16 +102,32 @@ class QueryPipeline:
             logger.info("Embedding query: %s", question[:100])
             query_embedding = await self.embedder.embed(question)
 
-            # Step 2: Run hybrid search (BM25 + vector)
-            top_k = settings.retrieval_top_k
+            # Step 2: Determine retrieval target size
+            # When reranker is enabled, fetch more candidates for reranking
+            if self.reranker is not None:
+                rrf_top_k = settings.reranker_top_k_before
+            else:
+                rrf_top_k = settings.retrieval_top_k
+
+            # Step 3: Run hybrid search (BM25 + vector)
             bm25_results, vector_results = await _parallel_search(
-                self.search_index, question, query_embedding, top_k
+                self.search_index, question, query_embedding, rrf_top_k
             )
 
-            # Step 3: RRF fusion
-            fused = rrf_fusion(bm25_results, vector_results, top_k=top_k)
+            # Step 4: RRF fusion
+            fused = rrf_fusion(bm25_results, vector_results, top_k=rrf_top_k)
 
-            # Step 4: Abstention check
+            # Step 5: Optional reranking (after RRF, before abstention)
+            if self.reranker is not None and fused:
+                fused = await _rerank_with_timeout(
+                    self.reranker,
+                    question,
+                    fused,
+                    settings.reranker_top_k_after,
+                    settings.reranker_timeout_seconds,
+                )
+
+            # Step 6: Abstention check
             if should_abstain(fused, settings.min_score_threshold):
                 logger.info(
                     "Abstention triggered for query: %s", question[:100]
@@ -273,3 +292,36 @@ async def _parallel_search(
     )
 
     return bm25_results, vector_results
+
+
+async def _rerank_with_timeout(
+    reranker,
+    query: str,
+    candidates: list[RetrievedChunk],
+    top_k: int,
+    timeout_seconds: float,
+) -> list[RetrievedChunk]:
+    """Run reranking with a timeout fallback.
+
+    If the reranker does not complete within *timeout_seconds*, log a warning
+    and return the original (non-reranked) candidates truncated to *top_k*.
+    """
+    try:
+        return await asyncio.wait_for(
+            reranker.rerank(query, candidates, top_k=top_k),
+            timeout=timeout_seconds,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Reranker timed out after %.1fs — falling back to RRF results "
+            "(%d candidates truncated to %d)",
+            timeout_seconds,
+            len(candidates),
+            top_k,
+        )
+        return candidates[:top_k]
+    except Exception as exc:
+        logger.warning(
+            "Reranker failed (%s) — falling back to RRF results", exc
+        )
+        return candidates[:top_k]

@@ -130,6 +130,19 @@ def get_job_registry():
     return get_job_registry._instance
 
 
+def get_reranker():
+    """Return the Reranker adapter instance, or None when disabled.
+
+    Configured via RERANKER_ENABLED env var.
+    """
+    settings = _get_settings()
+    if not settings.reranker_enabled:
+        return None
+    from src.adapters.cross_encoder_reranker import CrossEncoderReranker
+
+    return CrossEncoderReranker(model_name=settings.reranker_model)
+
+
 def get_ingestion_service():
     """Return a fully-wired IngestionService instance."""
     from src.core.ingestion_service import IngestionService
