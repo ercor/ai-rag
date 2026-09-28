@@ -106,6 +106,72 @@ def rrf_fusion(
     return results
 
 
+def rrf_fusion_multi(
+    variant_results: list[list[RetrievedChunk]],
+    top_k: int = 5,
+) -> list[RetrievedChunk]:
+    """Fuse results from multiple query variants using cross-variant RRF.
+
+    Each variant result list is treated as an independent ranking. A chunk's
+    merged RRF score accumulates contributions from each list where it appears:
+    score += 1 / (k + rank_in_that_list).
+
+    Chunks are deduplicated by identity (document_id, chunk_index, content_hash).
+    Results are sorted by descending accumulated score and truncated to top_k.
+
+    When only 1 variant is provided, behavior is equivalent to passing that
+    variant's list through a single-ranking RRF (each chunk gets 1/(k+rank)).
+
+    Args:
+        variant_results: List of per-variant result lists. Each inner list
+            contains RetrievedChunks sorted by descending relevance for that
+            variant's query.
+        top_k: Maximum number of fused results to return.
+
+    Returns:
+        Deduplicated list of RetrievedChunk sorted by descending merged RRF
+        score, truncated to top_k.
+    """
+    if not variant_results:
+        return []
+
+    fused: dict[str, dict] = {}
+
+    for variant_chunks in variant_results:
+        for rank, rc in enumerate(variant_chunks, start=1):
+            key = _chunk_key(rc.chunk)
+            if key not in fused:
+                fused[key] = {
+                    "chunk": rc.chunk,
+                    "score": 0.0,
+                    "bm25_rank": rc.bm25_rank,
+                    "vector_rank": rc.vector_rank,
+                }
+            fused[key]["score"] += 1.0 / (RRF_K + rank)
+
+    results = [
+        RetrievedChunk(
+            chunk=entry["chunk"],
+            score=entry["score"],
+            bm25_rank=entry["bm25_rank"],
+            vector_rank=entry["vector_rank"],
+        )
+        for entry in fused.values()
+    ]
+
+    results.sort(key=lambda r: r.score, reverse=True)
+    results = results[:top_k]
+
+    logger.debug(
+        "Multi-RRF fusion: %d variants -> %d fused (top_k=%d)",
+        len(variant_results),
+        len(results),
+        top_k,
+    )
+
+    return results
+
+
 def should_abstain(
     results: list[RetrievedChunk],
     min_score_threshold: float = 0.0,

@@ -19,6 +19,7 @@ This system enables users to ask questions in natural language and receive answe
 ### Core Features
 - **Hybrid Retrieval**: Combines lexical search (BM25 via PostgreSQL tsvector) with semantic search (vector similarity via pgvector) using Reciprocal Rank Fusion (RRF)
 - **Cross-Encoder Reranking**: Optional re-scoring of retrieval candidates using a cross-encoder model (`ms-marco-MiniLM-L-6-v2`) for improved precision. Fetches top-20 from RRF, reranks, and keeps top-5. Toggleable via `RERANKER_ENABLED` env var
+- **Query Rewriting**: Optional multi-query expansion via LLM. Generates semantically distinct rephrasings of the user's query, searches for each variant in parallel, and merges results via cross-variant RRF for improved recall on ambiguous queries. Toggleable via `QUERY_REWRITER_ENABLED` env var
 - **Structure-Aware Chunking**: Block-based chunking that preserves document hierarchy (headings, lists, tables) and respects block boundaries
 - **Grounded Generation**: LLM generates answers only from retrieved evidence, with strict citation requirements
 - **Citation Validation**: Post-generation validation ensures all citations reference actual retrieved chunks
@@ -99,6 +100,8 @@ The system follows hexagonal architecture for maximum extensibility:
 - `CitationValidator` - Citation verification
 - `AnswerRepository` - Answer persistence
 - `DocumentRegistry` - Document deduplication and tracking
+- `Reranker` - Cross-encoder re-scoring of retrieval candidates
+- `QueryRewriter` - Multi-query expansion for improved recall
 
 **Adapters (Implementations):**
 - `filesystem_source.py` - Local directory scanning with SHA-256 content hashing

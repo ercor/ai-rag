@@ -18,6 +18,7 @@ from src.container import (
     get_citation_validator,
     get_embedder,
     get_generator,
+    get_query_rewriter,
     get_reranker,
     get_search_index,
 )
@@ -52,6 +53,7 @@ def _get_pipeline() -> QueryPipeline:
     citation_validator = get_citation_validator()
     answer_repository = get_answer_repository()
     reranker = get_reranker()
+    query_rewriter = get_query_rewriter()
 
     if not all([embedder, search_index, generator, citation_validator, answer_repository]):
         missing = []
@@ -77,6 +79,7 @@ def _get_pipeline() -> QueryPipeline:
         citation_validator=citation_validator,
         answer_repository=answer_repository,
         reranker=reranker,
+        query_rewriter=query_rewriter,
     )
 
 

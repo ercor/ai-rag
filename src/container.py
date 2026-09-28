@@ -143,6 +143,22 @@ def get_reranker():
     return CrossEncoderReranker(model_name=settings.reranker_model)
 
 
+def get_query_rewriter():
+    """Return the QueryRewriter adapter instance, or None when disabled.
+
+    Configured via QUERY_REWRITER_ENABLED env var.
+    """
+    settings = _get_settings()
+    if not settings.query_rewriter_enabled:
+        return None
+    from src.adapters.llm_query_rewriter import LLMQueryRewriter
+
+    return LLMQueryRewriter(
+        generator=get_generator(),
+        num_variants=settings.query_rewriter_num_variants,
+    )
+
+
 def get_ingestion_service():
     """Return a fully-wired IngestionService instance."""
     from src.core.ingestion_service import IngestionService

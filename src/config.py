@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     reranker_top_k_after: int = 5
     reranker_timeout_seconds: float = 5.0
 
+    # Query Rewriting
+    query_rewriter_enabled: bool = False
+    query_rewriter_num_variants: int = 3
+
     # Adapter selectors (for future multi-adapter support)
     embedder_adapter: str = "ollama"
     generator_adapter: str = "ollama"

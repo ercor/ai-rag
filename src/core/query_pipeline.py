@@ -10,7 +10,7 @@ import uuid
 from dataclasses import dataclass
 
 from src.config import get_settings
-from src.core.retrieval import RetrievedChunk, rrf_fusion, should_abstain
+from src.core.retrieval import RetrievedChunk, rrf_fusion, rrf_fusion_multi, should_abstain
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ class QueryPipeline:
         citation_validator,
         answer_repository,
         reranker=None,
+        query_rewriter=None,
     ):
         self.embedder = embedder
         self.search_index = search_index
@@ -87,37 +88,29 @@ class QueryPipeline:
         self.citation_validator = citation_validator
         self.answer_repository = answer_repository
         self.reranker = reranker
+        self.query_rewriter = query_rewriter
 
     async def retrieve(self, question: str) -> QueryResult:
         """Phase 1: Embed query, retrieve chunks, check abstention.
 
         This runs synchronously (before streaming). If abstention triggers,
         no answer record is created and status is 'insufficient_evidence'.
+
+        When query_rewriter is set, the flow becomes:
+        rewrite -> [variants] -> embed each -> parallel search per variant
+        -> per-variant RRF -> cross-variant RRF merge -> rerank -> abstain.
         """
         settings = get_settings()
         answer_id = str(uuid.uuid4())
 
         try:
-            # Step 1: Embed the query
-            logger.info("Embedding query: %s", question[:100])
-            query_embedding = await self.embedder.embed(question)
-
-            # Step 2: Determine retrieval target size
-            # When reranker is enabled, fetch more candidates for reranking
-            if self.reranker is not None:
-                rrf_top_k = settings.reranker_top_k_before
+            # Step 0: Optional query rewriting
+            if self.query_rewriter is not None:
+                fused = await self._retrieve_with_rewriting(question, settings)
             else:
-                rrf_top_k = settings.retrieval_top_k
+                fused = await self._retrieve_single_query(question, settings)
 
-            # Step 3: Run hybrid search (BM25 + vector)
-            bm25_results, vector_results = await _parallel_search(
-                self.search_index, question, query_embedding, rrf_top_k
-            )
-
-            # Step 4: RRF fusion
-            fused = rrf_fusion(bm25_results, vector_results, top_k=rrf_top_k)
-
-            # Step 5: Optional reranking (after RRF, before abstention)
+            # Reranking (after RRF / multi-RRF, before abstention)
             if self.reranker is not None and fused:
                 fused = await _rerank_with_timeout(
                     self.reranker,
@@ -127,7 +120,7 @@ class QueryPipeline:
                     settings.reranker_timeout_seconds,
                 )
 
-            # Step 6: Abstention check
+            # Abstention check
             if should_abstain(fused, settings.min_score_threshold):
                 logger.info(
                     "Abstention triggered for query: %s", question[:100]
@@ -161,6 +154,76 @@ class QueryPipeline:
                 retrieved_chunks=[],
                 error=str(exc),
             )
+
+    async def _retrieve_single_query(
+        self, question: str, settings
+    ) -> list[RetrievedChunk]:
+        """Single-query retrieval path (no rewriting)."""
+        # Embed the query
+        logger.info("Embedding query: %s", question[:100])
+        query_embedding = await self.embedder.embed(question)
+
+        # Determine retrieval target size
+        if self.reranker is not None:
+            rrf_top_k = settings.reranker_top_k_before
+        else:
+            rrf_top_k = settings.retrieval_top_k
+
+        # Run hybrid search (BM25 + vector)
+        bm25_results, vector_results = await _parallel_search(
+            self.search_index, question, query_embedding, rrf_top_k
+        )
+
+        # RRF fusion
+        return rrf_fusion(bm25_results, vector_results, top_k=rrf_top_k)
+
+    async def _retrieve_with_rewriting(
+        self, question: str, settings
+    ) -> list[RetrievedChunk]:
+        """Multi-query retrieval path (with rewriting)."""
+        import time
+
+        rewrite_start = time.monotonic()
+
+        # Step 1: Rewrite query into variants
+        variants = await self.query_rewriter.rewrite(question)
+        logger.info(
+            "Query rewriting: %d variants produced in %.0fms",
+            len(variants),
+            (time.monotonic() - rewrite_start) * 1000,
+        )
+
+        # Step 2: Determine retrieval target size
+        if self.reranker is not None:
+            rrf_top_k = settings.reranker_top_k_before
+        else:
+            rrf_top_k = settings.retrieval_top_k
+
+        # Step 3: For each variant, embed and search in parallel
+        async def _search_variant(variant_query: str) -> list[RetrievedChunk]:
+            embedding = await self.embedder.embed(variant_query)
+            bm25_results, vector_results = await _parallel_search(
+                self.search_index, variant_query, embedding, rrf_top_k
+            )
+            return rrf_fusion(bm25_results, vector_results, top_k=rrf_top_k)
+
+        variant_results = await asyncio.gather(
+            *[_search_variant(v) for v in variants]
+        )
+
+        # Step 4: Cross-variant RRF merge
+        merged = rrf_fusion_multi(variant_results, top_k=rrf_top_k)
+
+        rewrite_duration_ms = (time.monotonic() - rewrite_start) * 1000
+        logger.info(
+            "Query rewriting complete: %d variants, %d merged chunks, "
+            "total rewrite+search time=%.0fms",
+            len(variants),
+            len(merged),
+            rewrite_duration_ms,
+        )
+
+        return merged
 
     async def generate_and_persist(
         self,
