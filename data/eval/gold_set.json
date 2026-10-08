@@ -1,0 +1,146 @@
+[
+  {
+    "question": "What is the per diem rate for domestic travel?",
+    "ground_truth": "Domestic travel per diem is $75 per day for meals.",
+    "contexts": ["Domestic travel per diem: $75 per day for meals. International travel per diem varies by country and is published on the intranet."],
+    "metadata": {"source": "travel_policy", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "How many days in advance should employees book travel?",
+    "ground_truth": "Employees should book at least 14 days in advance to receive preferred rates.",
+    "contexts": ["Employees should book at least 14 days in advance to receive preferred rates. Economy class is the standard for domestic flights."],
+    "metadata": {"source": "travel_policy", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "What is the process for submitting travel expenses?",
+    "ground_truth": "Travel expenses must be submitted within 30 days of trip completion. Receipts are required for all expenses over $25. The finance department will process reimbursements within 5 business days of approved submission.",
+    "contexts": ["Travel expenses must be submitted within 30 days of trip completion. Receipts are required for all expenses over $25. The finance department will process reimbursements within 5 business days of approved submission."],
+    "metadata": {"source": "travel_policy", "difficulty": "medium", "category": "procedural"}
+  },
+  {
+    "question": "When is business class allowed for flights?",
+    "ground_truth": "Business class may be approved for international flights exceeding 6 hours.",
+    "contexts": ["Economy class is the standard for domestic flights. Business class may be approved for international flights exceeding 6 hours."],
+    "metadata": {"source": "travel_policy", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "What happens if an employee violates the travel policy?",
+    "ground_truth": "Failure to comply may result in denial of expense reimbursement. Repeated violations may lead to disciplinary action.",
+    "contexts": ["Failure to comply with this policy may result in denial of expense reimbursement. Repeated violations may lead to disciplinary action."],
+    "metadata": {"source": "travel_policy", "difficulty": "medium", "category": "procedural"}
+  },
+  {
+    "question": "How does ground transportation work under the travel policy?",
+    "ground_truth": "Ride-sharing services are approved for airport-hotel travel. Rental cars require manager approval. Public transportation is encouraged where available and safe.",
+    "contexts": ["Ride-sharing services (Uber, Lyft) are approved for travel between airports and hotels. Rental cars require manager approval and must be booked through the corporate portal. Public transportation is encouraged where available and safe."],
+    "metadata": {"source": "travel_policy", "difficulty": "medium", "category": "procedural"}
+  },
+  {
+    "question": "What was the Q3 2026 revenue?",
+    "ground_truth": "Revenue reached $450M, up 15% year-over-year.",
+    "contexts": ["Q3 2026 showed strong growth across all business units. Revenue reached $450M, up 15% year-over-year."],
+    "metadata": {"source": "q3_results", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "How many monthly active users does the company have?",
+    "ground_truth": "Monthly Active Users: 2.3M (up 18% YoY).",
+    "contexts": ["Monthly Active Users: 2.3M (up 18% YoY)"],
+    "metadata": {"source": "q3_results", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "What is the operating margin for Q3 2026?",
+    "ground_truth": "Operating margin improved to 22%, driven by efficiency gains in cloud infrastructure.",
+    "contexts": ["Operating margin improved to 22%, driven by efficiency gains in cloud infrastructure."],
+    "metadata": {"source": "q3_results", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "How did the RAG platform perform after launch?",
+    "ground_truth": "The RAG platform launch exceeded expectations with 500 enterprise customers in the first quarter. The AI-powered search feature reduced average query resolution time by 40%.",
+    "contexts": ["The RAG platform launch exceeded expectations with 500 enterprise customers in the first quarter. The AI-powered search feature reduced average query resolution time by 40%."],
+    "metadata": {"source": "q3_results", "difficulty": "medium", "category": "factual"}
+  },
+  {
+    "question": "How does North America revenue compare to other regions?",
+    "ground_truth": "North America: $250M revenue (56% of total). Europe: $130M revenue (29%). Asia Pacific: $70M revenue (15%).",
+    "contexts": ["North America: $250M revenue (56% of total)", "Europe: $130M revenue (29% of total)", "Asia Pacific: $70M revenue (15% of total)"],
+    "metadata": {"source": "q3_results", "difficulty": "medium", "category": "comparative"}
+  },
+  {
+    "question": "What are the projected Q4 revenue figures?",
+    "ground_truth": "We project Q4 revenue of $480-500M, driven by seasonal demand and new enterprise contracts.",
+    "contexts": ["We project Q4 revenue of $480-500M, driven by seasonal demand and new enterprise contracts."],
+    "metadata": {"source": "q3_results", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "What are the main risks for Q4?",
+    "ground_truth": "Cloud infrastructure costs remain a concern, increasing 12% quarter-over-quarter. The team is evaluating reserved instance commitments and workload optimization to reduce costs by 15% in Q4.",
+    "contexts": ["Cloud infrastructure costs remain a concern, increasing 12% quarter-over-quarter. The team is evaluating reserved instance commitments and workload optimization to reduce costs by 15% in Q4."],
+    "metadata": {"source": "q3_results", "difficulty": "hard", "category": "factual"}
+  },
+  {
+    "question": "What tools are required for the development environment?",
+    "ground_truth": "Required tools: Git (latest stable), Docker Desktop, VS Code or JetBrains IDE, Node.js 20 LTS, Python 3.11+.",
+    "contexts": ["All engineers use macOS or Linux. Required tools: Git (latest stable), Docker Desktop, VS Code or JetBrains IDE, Node.js 20 LTS, Python 3.11+"],
+    "metadata": {"source": "engineering_onboarding", "difficulty": "easy", "category": "factual"}
+  },
+  {
+    "question": "What code standards must engineers follow?",
+    "ground_truth": "All code must pass linting before merge. Python uses ruff, TypeScript uses ESLint + Prettier, Go uses gofmt + golangci-lint. Pull requests require at least one approval and CI must pass.",
+    "contexts": ["All code must pass linting before merge. We use: Python: ruff for linting and formatting, TypeScript: ESLint + Prettier, Go: gofmt + golangci-lint", "Pull requests require at least one approval from a team member. CI must pass before merging."],
+    "metadata": {"source": "engineering_onboarding", "difficulty": "medium", "category": "procedural"}
+  },
+  {
+    "question": "What are the key principles of the hexagonal architecture?",
+    "ground_truth": "Dependencies point inward toward the domain. External services are behind port interfaces. Business logic has no framework dependencies. Adapters are swappable via configuration.",
+    "contexts": ["We follow hexagonal architecture (ports and adapters). Key principles: Dependencies point inward toward the domain, External services are behind port interfaces, Business logic has no framework dependencies, Adapters are swappable via configuration"],
+    "metadata": {"source": "engineering_onboarding", "difficulty": "medium", "category": "factual"}
+  },
+  {
+    "question": "What is the deployment process?",
+    "ground_truth": "Applications are deployed via Docker containers to Kubernetes. CI/CD pipeline: 1) Run tests, 2) Build container image, 3) Push to registry, 4) Deploy to staging (automatic), 5) Deploy to production (manual approval).",
+    "contexts": ["Applications are deployed via Docker containers to Kubernetes. The CI/CD pipeline: 1. Run tests (unit + integration) 2. Build container image 3. Push to registry 4. Deploy to staging (automatic) 5. Deploy to production (manual approval)"],
+    "metadata": {"source": "engineering_onboarding", "difficulty": "medium", "category": "procedural"}
+  },
+  {
+    "question": "How does the engineering team communicate?",
+    "ground_truth": "Slack: #engineering for general questions. Weekly architecture review: Thursdays at 2pm. Sprint planning: bi-weekly on Mondays. Incident response: PagerDuty.",
+    "contexts": ["Slack: #engineering for general questions", "Weekly architecture review: Thursdays at 2pm", "Sprint planning: bi-weekly on Mondays", "Incident response: PagerDuty (rotation schedule on wiki)"],
+    "metadata": {"source": "engineering_onboarding", "difficulty": "easy", "category": "procedural"}
+  },
+  {
+    "question": "Compare the revenue contribution of North America and Europe.",
+    "ground_truth": "North America contributed $250M (56% of total) while Europe contributed $130M (29% of total). North America is roughly twice Europe's contribution.",
+    "contexts": ["North America: $250M revenue (56% of total)", "Europe: $130M revenue (29% of total)"],
+    "metadata": {"source": "q3_results", "difficulty": "hard", "category": "comparative"}
+  },
+  {
+    "question": "What is the difference between domestic and international travel policies?",
+    "ground_truth": "Domestic flights use economy class; international flights over 6 hours may use business class. Domestic per diem is $75/day; international varies by country. Domestic hotel cap is $200/night; international is $350/night. International travel requires VP approval.",
+    "contexts": ["Economy class is the standard for domestic flights. Business class may be approved for international flights exceeding 6 hours.", "Domestic travel per diem: $75 per day for meals. International travel per diem varies by country.", "Hotel accommodations are capped at $200 per night for domestic and $350 for international travel.", "International travel requires additional approval from the VP of the division."],
+    "metadata": {"source": "travel_policy", "difficulty": "hard", "category": "comparative"}
+  },
+  {
+    "question": "How do customer metrics compare to employee metrics?",
+    "ground_truth": "Customer metrics: 2.3M MAU (up 18%), 94% retention rate, NPS of 72. Employee satisfaction is 4.2/5.0. Both show positive trends.",
+    "contexts": ["Monthly Active Users: 2.3M (up 18% YoY)", "Customer Retention Rate: 94%", "Net Promoter Score: 72", "Employee Satisfaction: 4.2/5.0"],
+    "metadata": {"source": "q3_results", "difficulty": "hard", "category": "comparative"}
+  },
+  {
+    "question": "What steps are needed to set up the development environment and submit a first PR?",
+    "ground_truth": "Install Git, Docker Desktop, VS Code/JetBrains, Node.js 20 LTS, Python 3.11+. Write code following linting standards (ruff/ESLint/gofmt). Create a pull request requiring at least one approval and passing CI.",
+    "contexts": ["Required tools: Git (latest stable), Docker Desktop, VS Code or JetBrains IDE, Node.js 20 LTS, Python 3.11+", "All code must pass linting before merge.", "Pull requests require at least one approval from a team member. CI must pass before merging."],
+    "metadata": {"source": "engineering_onboarding", "difficulty": "hard", "category": "procedural"}
+  },
+  {
+    "question": "What is the process for international travel from approval to expense reimbursement?",
+    "ground_truth": "1) Get manager and budget holder approval. 2) Get VP division approval for international. 3) Book through corporate portal at least 14 days in advance. 4) Handle passport/visa. 5) Submit expenses within 30 days with receipts for amounts over $25. 6) Finance processes reimbursement within 5 business days.",
+    "contexts": ["All travel must be pre-approved by the employee's direct manager and the department budget holder.", "International travel requires additional approval from the VP of the division.", "Employees should book at least 14 days in advance to receive preferred rates.", "Passport and visa requirements are the responsibility of the traveler.", "Travel expenses must be submitted within 30 days of trip completion. Receipts are required for all expenses over $25.", "The finance department will process reimbursements within 5 business days of approved submission."],
+    "metadata": {"source": "travel_policy", "difficulty": "hard", "category": "procedural"}
+  },
+  {
+    "question": "What is the Customer Retention Rate?",
+    "ground_truth": "Customer Retention Rate: 94%.",
+    "contexts": ["Customer Retention Rate: 94%"],
+    "metadata": {"source": "q3_results", "difficulty": "easy", "category": "factual"}
+  }
+]
