@@ -5,7 +5,9 @@ import ChatInput from "@/components/ChatInput";
 import AnswerDisplay from "@/components/AnswerDisplay";
 import SourcePanel from "@/components/SourcePanel";
 import FeedbackButtons from "@/components/FeedbackButtons";
+import ConversationSidebar from "@/components/ConversationSidebar";
 import { createAnswer, streamAnswer, type Citation } from "@/lib/sse";
+import type { ConversationWithAnswers } from "@/lib/conversations";
 
 type AnswerStatus =
   | "idle"
@@ -30,6 +32,7 @@ interface Message {
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +65,7 @@ export default function Home() {
 
       try {
         // Phase 1: Create answer (sync retrieval)
-        const response = await createAnswer(question);
+        const response = await createAnswer(question, currentConversationId || undefined);
 
         if (response.status === "insufficient_evidence") {
           setMessages((prev) =>
@@ -167,8 +170,43 @@ export default function Home() {
   // Get the last message for the source panel
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
 
+  const handleConversationSelect = useCallback((conversation: ConversationWithAnswers) => {
+    // Load messages from conversation
+    const loadedMessages: Message[] = conversation.answers
+      .filter((a) => a.status === "answered")
+      .map((a) => ({
+        id: a.id,
+        question: a.question,
+        answerText: a.answer || "",
+        citations: a.citations as Citation[],
+        status: "answered" as AnswerStatus,
+        answerId: a.id,
+        error: null,
+      }));
+    
+    setMessages(loadedMessages);
+    setCurrentConversationId(conversation.id);
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  const handleNewConversation = useCallback(() => {
+    setMessages([]);
+    setCurrentConversationId(null);
+  }, []);
+
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="flex h-full">
+      {/* Conversation Sidebar */}
+      <div className="hidden lg:block w-64 flex-shrink-0">
+        <ConversationSidebar
+          activeConversationId={currentConversationId}
+          onConversationSelect={handleConversationSelect}
+          onNewConversation={handleNewConversation}
+        />
+      </div>
+
+      {/* Main content area */}
+      <main className="flex-1 mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 overflow-y-auto">
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center gap-3">
@@ -254,5 +292,6 @@ export default function Home() {
         </aside>
       </div>
     </main>
+    </div>
   );
 }

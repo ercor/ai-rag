@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.answers import router as answers_router
+from src.api.conversations import router as conversations_router
 from src.api.health import router as health_router
 from src.api.ingestion import router as ingestion_router
 from src.config import get_settings
@@ -130,3 +131,4 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(ingestion_router, prefix="/v1")
 app.include_router(answers_router, prefix="/v1")
+app.include_router(conversations_router, prefix="/v1")

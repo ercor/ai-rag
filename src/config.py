@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     cache_ttl_seconds: int = 1800
 
+    # Conversation History
+    max_conversation_history: int = 5
+
     # Adapter selectors (for future multi-adapter support)
     embedder_adapter: str = "ollama"
     generator_adapter: str = "ollama"

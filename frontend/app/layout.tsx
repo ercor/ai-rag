@@ -13,7 +13,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <div className="flex h-screen">
+          {/* Sidebar will be rendered by page.tsx */}
+          <main className="flex-1 overflow-hidden">{children}</main>
+        </div>
+      </body>
     </html>
   );
 }

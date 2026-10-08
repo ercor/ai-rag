@@ -35,11 +35,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
  * Create an answer by POSTing the question.
  * Returns the response with answer_id and status.
  */
-export async function createAnswer(question: string): Promise<CreateAnswerResponse> {
+export async function createAnswer(
+  question: string,
+  conversationId?: string
+): Promise<CreateAnswerResponse> {
+  const body: { question: string; conversation_id?: string } = { question };
+  if (conversationId) {
+    body.conversation_id = conversationId;
+  }
+
   const res = await fetch(`${API_BASE}/v1/answers`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

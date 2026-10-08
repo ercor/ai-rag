@@ -38,12 +38,19 @@ class GenerationResult:
     status: str  # "answered" or "failed"
 
 
-def build_prompt(question: str, chunks: list[RetrievedChunk]) -> str:
-    """Build the generation prompt with retrieved context.
+def build_prompt(
+    question: str,
+    chunks: list[RetrievedChunk],
+    conversation_history: list[dict] | None = None,
+) -> str:
+    """Build the generation prompt with retrieved context and optional conversation history.
 
     Formats the question and retrieved chunks into a prompt that
     instructs the LLM to answer using only the provided context,
     citing sources with [N] markers.
+
+    If conversation_history is provided, includes prior Q&A exchanges
+    before the context section to enable multi-turn Q&A.
     """
     context_parts = []
     for i, rc in enumerate(chunks, start=1):
@@ -55,11 +62,22 @@ def build_prompt(question: str, chunks: list[RetrievedChunk]) -> str:
 
     context = "\n\n---\n\n".join(context_parts)
 
+    # Build conversation history section if provided
+    history_section = ""
+    if conversation_history:
+        history_parts = []
+        for exchange in conversation_history:
+            history_parts.append(f"Q: {exchange['question']}")
+            if exchange.get("answer"):
+                history_parts.append(f"A: {exchange['answer']}")
+        history_section = "## Conversation History\n\n" + "\n".join(history_parts) + "\n\n"
+
     prompt = (
         "You are a helpful assistant that answers questions based ONLY on the "
         "provided context. Cite your sources using [N] notation where N is the "
         "source number shown above. If the context does not contain enough "
         "information to answer the question, say so clearly.\n\n"
+        f"{history_section}"
         f"## Context\n\n{context}\n\n"
         f"## Question\n\n{question}\n\n"
         "## Answer\n"

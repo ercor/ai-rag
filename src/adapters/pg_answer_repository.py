@@ -53,6 +53,7 @@ class PgAnswerRepository:
         status: str,
         citations: list,
         chunk_ids: list[str],
+        conversation_id: str | None = None,
     ) -> None:
         """Persist a new answer record or update an existing one.
 
@@ -66,6 +67,7 @@ class PgAnswerRepository:
                     insufficient_evidence, failed.
             citations: List of citation dicts with chunk metadata.
             chunk_ids: List of UUID strings for the source chunks.
+            conversation_id: Optional UUID string linking to a conversation.
         """
         pool = await self._get_pool()
 
@@ -77,11 +79,13 @@ class PgAnswerRepository:
             except (ValueError, AttributeError):
                 logger.warning("Invalid chunk_id UUID: %s", cid)
 
+        conv_uuid = uuid.UUID(conversation_id) if conversation_id else None
+
         async with pool.acquire() as conn:
             await conn.execute(
                 """
-                INSERT INTO answers (id, question, answer, status, citations, chunk_ids)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO answers (id, question, answer, status, citations, chunk_ids, conversation_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT (id) DO UPDATE SET
                     answer = EXCLUDED.answer,
                     status = EXCLUDED.status,
@@ -94,6 +98,7 @@ class PgAnswerRepository:
                 status,
                 json.dumps(citations),
                 uuid_chunk_ids if uuid_chunk_ids else None,
+                conv_uuid,
             )
 
         logger.debug(

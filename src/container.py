@@ -175,6 +175,13 @@ def get_cache():
     return RedisCache(redis_url=settings.redis_url)
 
 
+def get_conversation_repository():
+    """Return the ConversationRepository adapter instance (asyncpg)."""
+    from src.adapters.pg_conversation_repository import PgConversationRepository
+
+    return PgConversationRepository()
+
+
 def get_ingestion_service():
     """Return a fully-wired IngestionService instance."""
     from src.core.ingestion_service import IngestionService

@@ -17,12 +17,14 @@ from src.container import (
     get_answer_repository,
     get_cache,
     get_citation_validator,
+    get_conversation_repository,
     get_embedder,
     get_generator,
     get_query_rewriter,
     get_reranker,
     get_search_index,
 )
+from src.config import get_settings
 from src.core.query_pipeline import QueryPipeline
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,7 @@ class CreateAnswerRequest(BaseModel):
     """Request body for POST /v1/answers."""
 
     question: str
+    conversation_id: str | None = None
 
 
 class FeedbackRequest(BaseModel):
@@ -103,6 +106,22 @@ async def create_answer(req: CreateAnswerRequest):
             detail="Question cannot be empty",
         )
 
+    # Validate conversation exists if provided
+    conversation_repo = None
+    if req.conversation_id:
+        conversation_repo = get_conversation_repository()
+        if conversation_repo is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="ConversationRepository adapter not configured",
+            )
+        conversation = await conversation_repo.get_by_id(req.conversation_id)
+        if conversation is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Conversation {req.conversation_id} not found",
+            )
+
     pipeline = _get_pipeline()
 
     # Cache check — return cached answer immediately on hit
@@ -133,7 +152,13 @@ async def create_answer(req: CreateAnswerRequest):
 
     # Launch generation task
     asyncio.create_task(
-        _run_generation(pipeline, query_result, queue),
+        _run_generation(
+            pipeline,
+            query_result,
+            queue,
+            conversation_id=req.conversation_id,
+            conversation_repo=conversation_repo,
+        ),
         name=f"generate-{query_result.answer_id}",
     )
 
@@ -145,7 +170,13 @@ async def create_answer(req: CreateAnswerRequest):
     }
 
 
-async def _run_generation(pipeline: QueryPipeline, query_result, queue: asyncio.Queue):
+async def _run_generation(
+    pipeline: QueryPipeline,
+    query_result,
+    queue: asyncio.Queue,
+    conversation_id: str | None = None,
+    conversation_repo=None,
+):
     """Background task: generate answer and push tokens to the SSE queue."""
     answer_id = query_result.answer_id
 
@@ -153,7 +184,25 @@ async def _run_generation(pipeline: QueryPipeline, query_result, queue: asyncio.
         # Build prompt
         from src.core.query_pipeline import build_prompt
 
-        prompt = build_prompt(query_result.question, query_result.retrieved_chunks)
+        # Load conversation history if provided
+        conversation_history = None
+        if conversation_repo and conversation_id:
+            settings = get_settings()
+            answers = await conversation_repo.get_answers(conversation_id)
+            # Get last N answered questions (excluding the current one)
+            history = [
+                {"question": a.question, "answer": a.answer}
+                for a in answers
+                if a.status == "answered" and a.answer
+            ][-settings.max_conversation_history :]
+            if history:
+                conversation_history = history
+
+        prompt = build_prompt(
+            query_result.question,
+            query_result.retrieved_chunks,
+            conversation_history=conversation_history,
+        )
 
         # Save answer record as streaming
         citations_meta = []
@@ -176,7 +225,21 @@ async def _run_generation(pipeline: QueryPipeline, query_result, queue: asyncio.
             status="streaming",
             citations=citations_meta,
             chunk_ids=[],
+            conversation_id=conversation_id,
         )
+
+        # Touch conversation to update timestamp
+        if conversation_repo and conversation_id:
+            await conversation_repo.touch(conversation_id)
+
+            # Auto-generate title from first question if title is default
+            conversation = await conversation_repo.get_by_id(conversation_id)
+            if conversation and conversation.title == "New Conversation":
+                # Use first 50 chars of question as title
+                title = query_result.question[:50]
+                if len(query_result.question) > 50:
+                    title += "..."
+                await conversation_repo.update_title(conversation_id, title)
 
         # Stream tokens
         tokens: list[str] = []
