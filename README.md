@@ -20,6 +20,9 @@ This system enables users to ask questions in natural language and receive answe
 - **Hybrid Retrieval**: Combines lexical search (BM25 via PostgreSQL tsvector) with semantic search (vector similarity via pgvector) using Reciprocal Rank Fusion (RRF)
 - **Cross-Encoder Reranking**: Optional re-scoring of retrieval candidates using a cross-encoder model (`ms-marco-MiniLM-L-6-v2`) for improved precision. Fetches top-20 from RRF, reranks, and keeps top-5. Toggleable via `RERANKER_ENABLED` env var
 - **Query Rewriting**: Optional multi-query expansion via LLM. Generates semantically distinct rephrasings of the user's query, searches for each variant in parallel, and merges results via cross-variant RRF for improved recall on ambiguous queries. Toggleable via `QUERY_REWRITER_ENABLED` env var
+- **Redis Caching**: Optional caching layer for frequent queries. Caches complete answers with configurable TTL. Falls back gracefully when Redis is unavailable. Toggleable via `CACHE_ENABLED` env var
+- **Conversation History**: Multi-turn Q&A with conversation management. Groups related questions/answers into conversations. Sidebar UI for browsing conversation history. Configurable history depth via `MAX_CONVERSATION_HISTORY` env var
+- **Evaluation Framework**: Comprehensive evaluation suite with RAGAS metrics (faithfulness, answer relevancy, context precision/recall) and custom metrics (citation precision/completeness, retrieval hit rate). CLI-based evaluation with JSON reports. Gold dataset included with 24 stratified samples
 - **Structure-Aware Chunking**: Block-based chunking that preserves document hierarchy (headings, lists, tables) and respects block boundaries
 - **Grounded Generation**: LLM generates answers only from retrieved evidence, with strict citation requirements
 - **Citation Validation**: Post-generation validation ensures all citations reference actual retrieved chunks
@@ -38,7 +41,7 @@ This system enables users to ask questions in natural language and receive answe
 - **GPU Acceleration**: Automatic GPU detection with dynamic batch size adjustment for 4x throughput improvement
 - **Threaded Parsing**: Sync parser libraries run in thread pool to avoid blocking the event loop
 - **Docker Compose**: One-command deployment with all dependencies
-- **Comprehensive Testing**: 173 unit tests + integration tests (pytest)
+- **Comprehensive Testing**: 277 unit tests + integration tests (pytest)
 - **OpenTelemetry Ready**: Structured for observability (logging in place, metrics/tracing ready)
 
 ## 🏗️ Architecture
@@ -102,6 +105,9 @@ The system follows hexagonal architecture for maximum extensibility:
 - `DocumentRegistry` - Document deduplication and tracking
 - `Reranker` - Cross-encoder re-scoring of retrieval candidates
 - `QueryRewriter` - Multi-query expansion for improved recall
+- `Cache` - Key-value caching with TTL (Redis or no-op)
+- `ConversationRepository` - Conversation history persistence
+- `EvaluationMetric` - RAG evaluation metric computation
 
 **Adapters (Implementations):**
 - `filesystem_source.py` - Local directory scanning with SHA-256 content hashing
@@ -113,6 +119,11 @@ The system follows hexagonal architecture for maximum extensibility:
 - `document_registry.py` - Document deduplication and change detection
 - `regex_citation_validator.py` - Citation regex validation
 - `pg_answer_repository.py` - asyncpg answer storage
+- `cross_encoder_reranker.py` - Cross-encoder reranking with sentence-transformers
+- `llm_query_rewriter.py` - LLM-based query expansion
+- `redis_cache.py` - Redis caching with graceful degradation
+- `noop_cache.py` - No-op cache for disabled caching
+- `pg_conversation_repository.py` - Conversation history persistence
 
 **Core Logic:**
 - `retrieval.py` - RRF fusion algorithm
@@ -252,18 +263,9 @@ The system follows hexagonal architecture for maximum extensibility:
 - Scanned PDFs (image-only) produce empty text
 - Only text-based PDFs supported
 
-❌ **No Reranking**
-- No cross-encoder reranking after retrieval
-- RRF fusion only (no learned ranking)
-
 ❌ **No Multi-Tenancy**
 - Single workspace
 - No document isolation between users/teams
-
-❌ **No Conversation History**
-- Single-turn Q&A only
-- No follow-up questions
-- No context from previous queries
 
 ❌ **CPU-Only Performance**
 - ~30s first-token latency (acceptable for MVP)
@@ -566,6 +568,73 @@ open htmlcov/index.html
 
 **Current coverage:** ~85%
 
+## 📊 Evaluation Framework
+
+The system includes a comprehensive evaluation framework for measuring RAG pipeline quality.
+
+### Running Evaluations
+
+```bash
+# Install evaluation dependencies
+pip install -e ".[eval]"
+
+# Run evaluation with all metrics
+python -m src.evaluation --dataset data/eval/gold_set.json
+
+# Run specific metrics only
+python -m src.evaluation --dataset data/eval/gold_set.json --metrics citation_precision,faithfulness
+
+# Custom output path
+python -m src.evaluation --dataset data/eval/gold_set.json --output reports/my_eval.json
+```
+
+### Available Metrics
+
+**RAGAS Metrics** (require LLM judge):
+- `faithfulness` - Measures if the answer is faithful to the retrieved contexts
+- `answer_relevancy` - Measures if the answer is relevant to the question
+- `context_precision` - Measures if retrieved contexts are precise
+- `context_recall` - Measures if all relevant contexts were retrieved
+
+**Custom Metrics** (no LLM required):
+- `citation_precision` - Fraction of citations that reference valid chunks
+- `citation_completeness` - Fraction of claims with supporting citations
+- `retrieval_hit_rate` - Whether at least one gold context was retrieved
+
+### Gold Dataset
+
+The gold dataset (`data/eval/gold_set.json`) contains 24 stratified samples covering:
+- **Sources**: travel_policy, q3_results, engineering_onboarding
+- **Difficulty**: easy, medium, hard
+- **Query types**: factual, comparative, procedural
+
+### Report Format
+
+Evaluation reports are JSON files with:
+- Per-metric aggregates (mean, std, min, max, count)
+- Per-sample scores
+- Metadata (timestamp, dataset path)
+
+Reports are saved to `data/eval/reports/` by default.
+
+### Adding Custom Metrics
+
+Create a class implementing the `EvaluationMetric` protocol:
+
+```python
+from src.ports.evaluation import EvaluationMetric
+
+class MyMetric:
+    @property
+    def name(self) -> str:
+        return "my_metric"
+
+    def compute(self, question: str, answer: str, contexts: list[str], 
+                ground_truth: str | None = None) -> float | None:
+        # Your metric logic here
+        return score  # 0.0 to 1.0, or None if cannot compute
+```
+
 ## 📁 Project Structure
 
 ```
@@ -583,7 +652,12 @@ ai-rag/
 │   │   ├── search_index.py      # SearchIndex interface
 │   │   ├── generator.py         # Generator interface
 │   │   ├── citation_validator.py # CitationValidator interface
-│   │   └── answer_repository.py # AnswerRepository interface
+│   │   ├── answer_repository.py # AnswerRepository interface
+│   │   ├── reranker.py          # Reranker interface
+│   │   ├── query_rewriter.py    # QueryRewriter interface
+│   │   ├── cache.py             # Cache interface
+│   │   ├── conversation_repository.py # ConversationRepository interface
+│   │   └── evaluation.py        # EvaluationMetric interface
 │   ├── adapters/                 # Hexagonal architecture adapters
 │   │   ├── filesystem_source.py # Local directory scanner with content hashing
 │   │   ├── parsers.py           # Multi-format document parsers (block-based)
@@ -593,41 +667,62 @@ ai-rag/
 │   │   ├── pgvector_index.py    # PostgreSQL hybrid search
 │   │   ├── document_registry.py # Document deduplication and tracking
 │   │   ├── regex_citation_validator.py # Citation validation
-│   │   └── pg_answer_repository.py     # Answer persistence
+│   │   ├── pg_answer_repository.py     # Answer persistence
+│   │   ├── cross_encoder_reranker.py   # Cross-encoder reranking
+│   │   ├── llm_query_rewriter.py       # LLM-based query expansion
+│   │   ├── redis_cache.py       # Redis caching
+│   │   ├── noop_cache.py        # No-op cache
+│   │   └── pg_conversation_repository.py # Conversation persistence
 │   ├── core/                     # Core business logic
 │   │   ├── retrieval.py         # RRF fusion algorithm
 │   │   ├── query_pipeline.py    # Query orchestration
 │   │   ├── ingestion_service.py # Ingestion pipeline orchestration
-│   │   └── job_registry.py      # Async job tracking
+│   │   ├── job_registry.py      # Async job tracking
+│   │   └── cache_key.py         # Cache key computation
+│   ├── evaluation/               # Evaluation framework
+│   │   ├── __main__.py          # CLI entry point
+│   │   ├── custom_metrics.py    # Custom evaluation metrics
+│   │   ├── dataset.py           # Gold dataset loader
+│   │   ├── ragas_adapter.py     # RAGAS metrics integration
+│   │   ├── report.py            # JSON report generator
+│   │   └── runner.py            # Evaluation runner
 │   └── api/                      # API routes
 │       ├── answers.py           # POST /v1/answers, GET /stream
+│       ├── conversations.py     # Conversation CRUD endpoints
 │       ├── ingestion.py         # POST /v1/ingest, GET /v1/ingest/{job_id}
 │       └── health.py            # GET /health
 ├── frontend/                     # Next.js frontend
 │   ├── app/
-│   │   ├── page.tsx             # Main chat interface
-│   │   └── layout.tsx           # Root layout
+│   │   ├── page.tsx             # Main chat interface with conversation support
+│   │   ├── layout.tsx           # Root layout with sidebar
+│   │   └── icon.svg             # Favicon
 │   ├── components/
 │   │   ├── ChatInput.tsx        # Question input
 │   │   ├── AnswerDisplay.tsx    # Streaming answer display
 │   │   ├── CitationBadge.tsx    # Clickable citation badges
 │   │   ├── SourcePanel.tsx      # Source document panel
-│   │   └── FeedbackButtons.tsx  # Thumbs up/down feedback
+│   │   ├── FeedbackButtons.tsx  # Thumbs up/down feedback
+│   │   └── ConversationSidebar.tsx # Conversation list sidebar
 │   ├── lib/
-│   │   └── sse.ts               # SSE client for streaming
+│   │   ├── sse.ts               # SSE client for streaming
+│   │   └── conversations.ts     # Conversation API client
 │   ├── Dockerfile               # Frontend container
 │   ├── package.json
 │   └── next.config.js
 ├── tests/                        # Test suites
-│   ├── unit/                    # Unit tests (151 tests, no Docker)
+│   ├── unit/                    # Unit tests (277 tests, no Docker)
 │   ├── integration/             # Integration tests (PostgreSQL)
 │   └── e2e/                     # End-to-end tests (full stack)
 ├── migrations/                   # Database migrations
 │   ├── 001_initial_schema.sql   # Initial schema with pgvector
 │   ├── 002_documents.sql        # Documents table for deduplication
-│   └── 003_chunk_metadata.sql   # Page number and anchor columns
+│   ├── 003_chunk_metadata.sql   # Page number and anchor columns
+│   └── 004_conversations.sql    # Conversations table and FK on answers
 ├── data/                         # Sample data
-│   └── docs/                    # Sample documents
+│   ├── docs/                    # Sample documents
+│   └── eval/                    # Evaluation framework
+│       ├── gold_set.json        # Gold dataset (24 stratified samples)
+│       └── reports/             # Evaluation report output directory
 ├── docker-compose.yml            # Multi-container orchestration
 ├── Dockerfile.backend            # Backend container
 ├── .env.example                  # Environment configuration template
@@ -684,6 +779,30 @@ To use GPU acceleration:
 **Generation:**
 - `GENERATION_MAX_TOKENS` - Maximum tokens in response
 - `GENERATION_TEMPERATURE` - LLM temperature (0.0-1.0)
+
+**Reranking:**
+- `RERANKER_ENABLED` - Enable cross-encoder reranking (default: true)
+- `RERANKER_MODEL` - Cross-encoder model name (default: cross-encoder/ms-marco-MiniLM-L-6-v2)
+- `RERANKER_TOP_K_BEFORE` - Number of candidates to fetch before reranking (default: 20)
+- `RERANKER_TOP_K_AFTER` - Number of candidates to keep after reranking (default: 5)
+- `RERANKER_TIMEOUT_SECONDS` - Timeout for reranking operation (default: 5.0)
+
+**Query Rewriting:**
+- `QUERY_REWRITER_ENABLED` - Enable LLM-based query expansion (default: false)
+- `QUERY_REWRITER_NUM_VARIANTS` - Number of query variants to generate (default: 3)
+
+**Caching:**
+- `CACHE_ENABLED` - Enable Redis caching (default: true)
+- `REDIS_URL` - Redis connection URL (default: redis://localhost:6379)
+- `CACHE_TTL_SECONDS` - Cache time-to-live in seconds (default: 1800)
+
+**Conversation History:**
+- `MAX_CONVERSATION_HISTORY` - Number of previous Q&A pairs to include in prompt (default: 5)
+
+**Evaluation:**
+- `EVAL_DATASET_PATH` - Path to gold dataset JSON file (default: data/eval/gold_set.json)
+- `EVAL_METRICS` - Comma-separated list of metrics to compute (default: all)
+- `EVAL_REPORT_DIR` - Directory for evaluation reports (default: data/eval/reports)
 
 **Application:**
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
@@ -819,22 +938,22 @@ curl http://localhost:8000/health
 
 ### Phase 2: Production Hardening
 - [ ] Authentication and authorization (OAuth2/OIDC)
-- [ ] Cross-encoder reranking for improved precision
+- [x] Cross-encoder reranking for improved precision ✅
 - [ ] Multi-tenancy support
-- [ ] Conversation history and multi-turn Q&A
+- [x] Conversation history and multi-turn Q&A ✅
 - [ ] Observability (metrics, traces, dashboards)
 - [ ] Admin interface for document management
 
 ### Phase 3: Scale and Performance
 - [ ] Distributed architecture for high availability
-- [ ] Caching layer (Redis) for frequent queries
+- [x] Caching layer (Redis) for frequent queries ✅
 
 ### Phase 4: Advanced Features
-- [ ] Query rewriting and expansion
+- [x] Query rewriting and expansion ✅
 - [ ] Multi-modal support (images, tables)
 - [ ] Federated search across multiple sources
 - [ ] Custom embedding models (fine-tuned)
-- [ ] Evaluation framework (RAGAS, custom metrics)
+- [x] Evaluation framework (RAGAS, custom metrics) ✅
 - [ ] A/B testing framework
 
 ### ✅ Completed
@@ -844,6 +963,11 @@ curl http://localhost:8000/health
 - [x] Structure-aware chunking (block-based)
 - [x] Per-source-type chunking configuration
 - [x] GPU acceleration with auto-detection and dynamic batch sizing
+- [x] Cross-encoder reranking with timeout handling
+- [x] Query rewriting with multi-query expansion
+- [x] Redis caching with graceful degradation
+- [x] Conversation history with multi-turn Q&A
+- [x] Evaluation framework with RAGAS metrics
 
 ## 🤝 Contributing
 
