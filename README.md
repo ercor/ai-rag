@@ -2,16 +2,16 @@
 
 A production-ready Retrieval-Augmented Generation (RAG) system for enterprise document question answering with verifiable citations. Built with Python FastAPI backend, Next.js frontend, and PostgreSQL+pgvector for hybrid search.
 
-## 🎯 Overview
+## Overview
 
 This system enables users to ask questions in natural language and receive answers sourced exclusively from authorized documents, with inline citations and source references. The system implements a complete vertical slice: document ingestion → hybrid retrieval → grounded generation → streaming responses.
 
 **Latest Improvements (v1.1):**
-- 🚀 **Cross-Encoder Reranking**: Improved retrieval precision with optional reranking
-- 🔄 **Multi-Query Expansion**: Better recall through query rewriting
-- ⚡ **Redis Caching**: Faster response times for repeated queries
-- 💬 **Conversation History**: Multi-turn Q&A with persistent context
-- 📊 **Evaluation Framework**: Comprehensive quality metrics with RAGAS integration
+- **Cross-Encoder Reranking**: Improved retrieval precision with optional reranking
+- **Multi-Query Expansion**: Better recall through query rewriting
+- **Redis Caching**: Faster response times for repeated queries
+- **Conversation History**: Multi-turn Q&A with persistent context
+- **Evaluation Framework**: Comprehensive quality metrics with RAGAS integration
 
 **Key Capabilities:**
 - Hybrid search (BM25 + vector similarity) with RRF fusion
@@ -26,7 +26,7 @@ This system enables users to ask questions in natural language and receive answe
 - Comprehensive evaluation framework with RAGAS metrics
 - Hexagonal architecture for extensibility
 
-## ✨ Features
+## Features
 
 ### Core Features
 - **Hybrid Retrieval**: Combines lexical search (BM25 via PostgreSQL tsvector) with semantic search (vector similarity via pgvector) using Reciprocal Rank Fusion (RRF)
@@ -56,7 +56,7 @@ This system enables users to ask questions in natural language and receive answe
 - **Comprehensive Testing**: 277 unit tests + integration tests (pytest)
 - **OpenTelemetry Ready**: Structured for observability (logging in place, metrics/tracing ready)
 
-## 🏗️ Architecture
+## Architecture
 
 ### System Architecture
 
@@ -147,7 +147,7 @@ The system follows hexagonal architecture for maximum extensibility:
 - `ingestion_service.py` - Ingestion pipeline orchestration with dedup
 - `job_registry.py` - Async job tracking and progress reporting
 
-## 📐 Design Decisions
+## Design Decisions
 
 ### Why PostgreSQL + pgvector?
 - **Single Source of Truth**: Metadata, vectors, and full-text search in one database
@@ -180,7 +180,7 @@ The system follows hexagonal architecture for maximum extensibility:
 - **Validated Scale**: Works well up to ~10K chunks (sufficient for MVP)
 - **Future Path**: Can split into documents + chunks tables when needed
 
-## 📊 Specifications
+## Specifications
 
 ### Performance Targets
 - **Ingestion**: 10-100 documents processed in < 5 minutes
@@ -225,7 +225,7 @@ The system follows hexagonal architecture for maximum extensibility:
 - **Temperature**: 0.1 (low for factual accuracy)
 - **Max Tokens**: 1024
 
-## 🚀 Capabilities
+## Capabilities
 
 ### What the System Can Do
 
@@ -266,7 +266,7 @@ The system follows hexagonal architecture for maximum extensibility:
 - Track ingestion job progress
 - Report per-file failures
 
-## ⚠️ Limitations
+## Limitations
 
 ### Current Limitations
 
@@ -295,21 +295,21 @@ The system follows hexagonal architecture for maximum extensibility:
 
 ### Known Technical Constraints
 
-⚠️ **CPU-Only Performance**
+ **CPU-Only Performance**
 - First-token latency: ~30s on CPU (acceptable for development/testing)
 - Recommendation: Use GPU-enabled Ollama for production deployments
 - With GPU: First-token latency drops to ~3-5s
 
-⚠️ **Reranker Model Download**
+ **Reranker Model Download**
 - First-time setup requires downloading the cross-encoder model (~500MB)
 - Model is cached locally after first download
 - Alternative: Disable reranking with `RERANKER_ENABLED=false`
 
-⚠️ **Evaluation Dependencies**
+ **Evaluation Dependencies**
 - RAGAS metrics require additional dependencies: `pip install -e ".[eval]"`
 - Custom metrics (citation precision/completeness) work without extra dependencies
 
-## 🛠️ Quick Start Guide
+## Quick Start Guide
 
 ### Prerequisites
 
@@ -504,7 +504,7 @@ docker compose down
 docker compose down -v
 ```
 
-## 📖 Usage Examples
+## Usage Examples
 
 ### Example 1: Ask a Question
 
@@ -540,7 +540,7 @@ docker compose down -v
 
 **Citations:** None
 
-## 🧪 Testing
+## Testing
 
 ### Run Unit Tests
 
@@ -596,7 +596,7 @@ open htmlcov/index.html
 
 **Current coverage:** ~85%
 
-## 📊 Evaluation Framework
+## Evaluation Framework
 
 The system includes a comprehensive evaluation framework for measuring RAG pipeline quality.
 
@@ -663,7 +663,7 @@ class MyMetric:
         return score  # 0.0 to 1.0, or None if cannot compute
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ai-rag/
@@ -759,7 +759,7 @@ ai-rag/
 └── README.md                     # This file
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -836,7 +836,7 @@ To use GPU acceleration:
 - `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
 - `CORS_ORIGINS` - Allowed CORS origins
 
-## 🚦 API Reference
+## API Reference
 
 ### POST /api/v1/ingest
 
@@ -1046,7 +1046,7 @@ curl http://localhost:8000/health
 }
 ```
 
-## 🗺️ Roadmap
+## Roadmap
 
 ### Phase 2: Production Hardening
 - [ ] Authentication and authorization (OAuth2/OIDC)
@@ -1081,7 +1081,7 @@ curl http://localhost:8000/health
 - [x] Conversation history with multi-turn Q&A
 - [x] Evaluation framework with RAGAS metrics
 
-## 🤝 Contributing
+## Contributing
 
 This is an MVP implementation. For production use, consider:
 - Adding authentication and authorization
@@ -1090,21 +1090,21 @@ This is an MVP implementation. For production use, consider:
 - Scaling for your specific use case
 - Customizing chunking strategies for your document types
 
-## 📄 License
+## License
 
 This project is provided as-is for educational and evaluation purposes.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **Ollama** - Local LLM runtime
 - **pgvector** - PostgreSQL vector extension
 - **FastAPI** - Modern Python web framework
 - **Next.js** - React framework
 
-## 📞 Support
+## Support
 
 For issues, questions, or contributions, please open an issue in the repository.
 
 ---
 
-**Built with ❤️ using Python, FastAPI, Next.js, and PostgreSQL**
+**Built with  using Python, FastAPI, Next.js, and PostgreSQL**
