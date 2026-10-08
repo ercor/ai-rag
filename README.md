@@ -4,14 +4,26 @@ A production-ready Retrieval-Augmented Generation (RAG) system for enterprise do
 
 ## 🎯 Overview
 
-This system enables users to ask questions in natural language and receive answers sourced exclusively from authorized documents, with inline citations and source references. The MVP implements a complete vertical slice: document ingestion → hybrid retrieval → grounded generation → streaming responses.
+This system enables users to ask questions in natural language and receive answers sourced exclusively from authorized documents, with inline citations and source references. The system implements a complete vertical slice: document ingestion → hybrid retrieval → grounded generation → streaming responses.
+
+**Latest Improvements (v1.1):**
+- 🚀 **Cross-Encoder Reranking**: Improved retrieval precision with optional reranking
+- 🔄 **Multi-Query Expansion**: Better recall through query rewriting
+- ⚡ **Redis Caching**: Faster response times for repeated queries
+- 💬 **Conversation History**: Multi-turn Q&A with persistent context
+- 📊 **Evaluation Framework**: Comprehensive quality metrics with RAGAS integration
 
 **Key Capabilities:**
 - Hybrid search (BM25 + vector similarity) with RRF fusion
+- Cross-encoder reranking for improved retrieval precision
+- Multi-query expansion for better recall on ambiguous queries
+- Redis caching for accelerated response times
+- Multi-turn conversation history with context awareness
 - Structure-aware document chunking with heading preservation
 - Grounded-answer generation with citation validation
 - Real-time streaming responses via Server-Sent Events
 - Multi-format document support (PDF, DOCX, HTML, TXT, MD)
+- Comprehensive evaluation framework with RAGAS metrics
 - Hexagonal architecture for extensibility
 
 ## ✨ Features
@@ -53,6 +65,7 @@ This system enables users to ask questions in natural language and receive answe
 │                         Frontend                             │
 │                    (Next.js + Tailwind)                      │
 │  ChatInput → AnswerDisplay → CitationBadge → SourcePanel    │
+│  ConversationSidebar ← → Conversation History               │
 └──────────────────────┬──────────────────────────────────────┘
                        │ SSE (POST /v1/answers)
                        ▼
@@ -67,26 +80,29 @@ This system enables users to ask questions in natural language and receive answe
 ┌──────────────────┐         ┌──────────────────┐
 │  Query Pipeline  │         │ Ingestion Service│
 │                  │         │                  │
-│ 1. Embed Query   │         │ 1. Scan Directory│
-│ 2. Hybrid Search │         │ 2. Parse Docs    │
-│ 3. RRF Fusion    │         │ 3. Chunk         │
-│ 4. Generate      │         │ 4. Embed         │
-│ 5. Validate      │         │ 5. Store         │
-└────────┬─────────┘         └────────┬─────────┘
-         │                            │
-         └────────────┬───────────────┘
-                      │
-        ┌─────────────┴─────────────┐
-        │                           │
-        ▼                           ▼
-┌──────────────────┐      ┌──────────────────┐
-│  PostgreSQL +    │      │    Ollama API    │
-│    pgvector      │      │                  │
-│                  │      │ - Embeddings     │
-│ - BM25 (tsvector)│      │ - LLM Generation │
-│ - Vector (HNSW)  │      │   (qwen2.5)      │
-│ - Metadata       │      │                  │
-└──────────────────┘      └──────────────────┘
+│ 1. Cache Check   │         │ 1. Scan Directory│
+│ 2. Rewrite Query │         │ 2. Parse Docs    │
+│ 3. Embed Query   │         │ 3. Chunk         │
+│ 4. Hybrid Search │         │ 4. Embed         │
+│ 5. RRF Fusion    │         │ 5. Store         │
+│ 6. Rerank        │         └──────────────────┘
+│ 7. Generate      │
+│ 8. Validate      │
+│ 9. Cache Store   │
+└────────┬─────────┘
+         │
+         ├─────────────────┬──────────────────┐
+         │                 │                  │
+         ▼                 ▼                  ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│  PostgreSQL +    │ │    Redis Cache   │ │    Ollama API    │
+│    pgvector      │ │                  │ │                  │
+│                  │ │ - Answer Cache   │ │ - Embeddings     │
+│ - BM25 (tsvector)│ │ - TTL Support    │ │ - LLM Generation │
+│ - Vector (HNSW)  │ │ - Graceful Fail  │ │   (qwen2.5)      │
+│ - Metadata       │ └──────────────────┘ │ - Reranking      │
+│ - Conversations  │                      │ - Query Rewrite  │
+└──────────────────┘                      └──────────────────┘
 ```
 
 ### Hexagonal Architecture (Ports & Adapters)
@@ -267,10 +283,6 @@ The system follows hexagonal architecture for maximum extensibility:
 - Single workspace
 - No document isolation between users/teams
 
-❌ **CPU-Only Performance**
-- ~30s first-token latency (acceptable for MVP)
-- Not suitable for production with many users
-
 ❌ **No Observability**
 - Basic logging only
 - No metrics, traces, or dashboards
@@ -280,6 +292,22 @@ The system follows hexagonal architecture for maximum extensibility:
 - No document management UI
 - No user management
 - No system configuration UI
+
+### Known Technical Constraints
+
+⚠️ **CPU-Only Performance**
+- First-token latency: ~30s on CPU (acceptable for development/testing)
+- Recommendation: Use GPU-enabled Ollama for production deployments
+- With GPU: First-token latency drops to ~3-5s
+
+⚠️ **Reranker Model Download**
+- First-time setup requires downloading the cross-encoder model (~500MB)
+- Model is cached locally after first download
+- Alternative: Disable reranking with `RERANKER_ENABLED=false`
+
+⚠️ **Evaluation Dependencies**
+- RAGAS metrics require additional dependencies: `pip install -e ".[eval]"`
+- Custom metrics (citation precision/completeness) work without extra dependencies
 
 ## 🛠️ Quick Start Guide
 
@@ -861,7 +889,7 @@ Submit a question (returns answer_id).
 ```bash
 curl -X POST http://localhost:8000/api/v1/answers \
   -H "Content-Type: application/json" \
-  -d '{"question": "What is the termination clause?"}'
+  -d '{"question": "What is the termination clause?", "conversation_id": "conv-123"}'
 ```
 
 **Response:**
@@ -871,6 +899,8 @@ curl -X POST http://localhost:8000/api/v1/answers \
   "status": "processing"
 }
 ```
+
+**Note:** `conversation_id` is optional. When provided, the answer is linked to the conversation and conversation history is included in the prompt context.
 
 ### GET /api/v1/answers/{answer_id}/stream
 
@@ -916,6 +946,88 @@ curl -X POST http://localhost:8000/api/v1/answers/abc123-def456/feedback \
   "status": "success"
 }
 ```
+
+### POST /api/v1/conversations
+
+Create a new conversation.
+
+**Request:**
+```bash
+curl -X POST http://localhost:8000/api/v1/conversations \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Contract Review"}'
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "conv-abc123",
+  "title": "Contract Review",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+### GET /api/v1/conversations
+
+List all conversations (most recent first).
+
+**Request:**
+```bash
+curl http://localhost:8000/api/v1/conversations
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "conv-abc123",
+    "title": "Contract Review",
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+### GET /api/v1/conversations/{conversation_id}
+
+Get a conversation with all its answers.
+
+**Request:**
+```bash
+curl http://localhost:8000/api/v1/conversations/conv-abc123
+```
+
+**Response:**
+```json
+{
+  "id": "conv-abc123",
+  "title": "Contract Review",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:35:00Z",
+  "answers": [
+    {
+      "id": "answer-1",
+      "question": "What is the termination clause?",
+      "answer": "The termination clause states...",
+      "status": "answered",
+      "citations": [...],
+      "created_at": "2024-01-15T10:31:00Z"
+    }
+  ]
+}
+```
+
+### DELETE /api/v1/conversations/{conversation_id}
+
+Delete a conversation and all its answers.
+
+**Request:**
+```bash
+curl -X DELETE http://localhost:8000/api/v1/conversations/conv-abc123
+```
+
+**Response (204 No Content):** Empty response
 
 ### GET /health
 
